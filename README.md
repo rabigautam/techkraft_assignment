@@ -502,3 +502,381 @@ Log parsing logic design: 7 minutes
 Script implementation: 10 minutes
 Validation and edge case handling: 3 minutes
 
+
+--
+# Part 5: Network Architecture Design (DNS Redundancy)
+
+## Overview
+
+This design addresses the existing single point of failure in TechKraft’s DNS infrastructure, where a single Unbound DNS server runs on EC2 without redundancy or failover.
+
+The proposed architecture uses AWS Route 53 with health checks and multi-region failover to ensure high availability, low latency, and resilience.
+
+---
+
+## Current Problem
+
+- Single Unbound DNS server on EC2
+- No redundancy or failover mechanism
+- High risk of downtime due to single point of failure
+- No geographic optimization for South Asia users
+
+---
+
+## Proposed Architecture
+
+### High-Level Architecture (ASCII Diagram)
+
+                +----------------------+
+                |   Route 53 (DNS)     |
+                +----------+-----------+
+                           |
+    +----------------------+----------------------+
+    |                                             |
+
+Primary Endpoint Secondary Endpoint
+(ap-south-1) (ap-southeast-1)
+| |
++------------------+ +------------------+
+| EC2 DNS (Unbound)| | EC2 DNS (Unbound)|
+| Multi-AZ Setup | | Multi-AZ Setup |
++------------------+ +------------------+
+| |
+Health Check Health Check
+(Route 53 Monitor) (Route 53 Monitor)
+
+
+---
+
+## Key Components
+
+### 1. Route 53 (DNS Layer)
+- Global DNS management service
+- Provides failover routing policy
+- Routes traffic based on health checks and latency
+
+---
+
+### 2. Primary DNS (ap-south-1)
+- Unbound DNS running on EC2 instances
+- Deployed across multiple Availability Zones
+- Serves majority of Nepal and South Asia traffic
+
+---
+
+### 3. Secondary DNS (ap-southeast-1)
+- Disaster recovery region
+- Automatically receives traffic if primary fails
+- Ensures global availability
+
+---
+
+### 4. Health Checks
+- Route 53 health checks on DNS endpoints
+- Monitors:
+  - Port 53 availability (TCP/UDP)
+  - DNS resolution success
+- Configuration:
+  - Interval: 30 seconds
+  - Failure threshold: 3 consecutive failures
+
+---
+
+## Failover Logic
+
+1. Route 53 routes traffic to primary region (ap-south-1)
+2. Health checks continuously monitor DNS availability
+3. If failure is detected:
+   - Traffic automatically shifts to secondary region (ap-southeast-1)
+4. When primary recovers:
+   - Traffic gradually shifts back
+
+---
+
+## Latency Considerations (South Asia / Nepal)
+
+- Primary region: ap-south-1 (Mumbai)
+  - Lowest latency for Nepal users (~20–40 ms)
+
+- Secondary region: ap-southeast-1 (Singapore)
+  - Backup region (~70–100 ms latency)
+
+- Route 53 latency-based routing ensures:
+  - Nepal users are routed to Mumbai by default
+  - Failover only triggers when required
+
+---
+
+## Cost Optimization
+
+### Estimated Monthly Cost
+
+- Route 53 hosted zone: low fixed cost (~$0.50/month)
+- DNS queries: pay-per-million requests (low cost at small scale)
+- EC2 instances:
+  - 2 small instances (t3.micro or t3.small)
+- Health checks:
+  - Minimal additional cost per check
+
+---
+
+### Optimization Strategies
+
+- Use small EC2 instances for DNS nodes
+- Avoid over-provisioning secondary region
+- Use caching to reduce DNS query load
+- Scale only when traffic increases
+
+---
+
+## Implementation Timeline
+
+### Phase 1 (1–2 days)
+- Create Route 53 hosted zone
+- Configure DNS records
+
+### Phase 2 (2–3 days)
+- Deploy Unbound DNS in ap-south-1
+- Configure multi-AZ setup
+
+### Phase 3 (2–3 days)
+- Deploy secondary DNS in ap-southeast-1
+- Configure synchronization between nodes
+
+### Phase 4 (1–2 days)
+- Configure Route 53 health checks
+- Test failover scenarios
+
+---
+
+## Total Estimated Time
+
+5–7 days
+
+---
+
+## Key Design Decisions
+
+- Multi-region deployment for high availability
+- Route 53 failover routing for automatic recovery
+- Health checks for continuous monitoring
+- Region selection optimized for Nepal users
+
+---
+
+## Assumptions
+
+## Tools Used
+AWS Route 53 (DNS + failover routing)
+AWS EC2 (Unbound DNS servers)
+AWS Health Checks (Route 53 monitoring)
+Multi-AZ AWS architecture design
+AWS latency-based routing (conceptual)
+Networking fundamentals (DNS, TCP/UDP 53) 
+## Summary
+
+This architecture improves:
+
+- High availability by removing single point of failure
+- Reliability through multi-region redundancy
+- Performance with low-latency routing for Nepal users
+- Fault tolerance with automated failover
+- Cost efficiency using lightweight infrastructure
+
+#### Time Spent 20 minutes
+
+
+# Kubernetes Section (Bonus)
+
+## Overview
+
+This section demonstrates a basic Kubernetes deployment for the Flask application from Part 2.  
+The focus is on understanding core Kubernetes objects rather than advanced cluster design.
+
+I am still learning Kubernetes, so this implementation focuses on simple, correct usage of fundamental resources.
+
+---
+
+## What is being deployed
+
+A simple Flask application container with:
+
+- 2 replicas for basic availability
+- A Kubernetes Deployment for scaling
+- A Service to expose the application
+- Basic health checks (liveness/readiness probes)
+- Resource requests and limits
+
+---
+
+
+# Part 6: CI/CD Pipeline Review
+
+## Overview
+
+This section reviews an existing GitHub Actions pipeline and identifies critical issues related to security, reliability, and production readiness. It also proposes a structured CI/CD improvement strategy including testing, approvals, and rollback mechanisms.
+
+## Kubernetes Deployment (Bonus)
+
+Overview
+
+This section demonstrates a basic Kubernetes deployment for the Flask application from Part 2.
+
+The focus is on understanding core Kubernetes objects rather than advanced cluster design.
+
+I am still learning Kubernetes, so this implementation focuses on simple and correct usage of fundamental resources.
+
+What is being deployed
+
+A simple Flask application container with:
+
+2 replicas for basic availability
+Deployment for workload management
+Service for network exposure
+Horizontal Pod Autoscaler for scaling
+Basic health checks (liveness/readiness probes)
+Resource requests and limits for stability
+Single Kubernetes Manifest (deployment.yaml)
+
+All Kubernetes resources are combined into a single file using YAML multi-document format (---).
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flask-app
+  labels:
+    app: flask-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: flask-app
+  template:
+    metadata:
+      labels:
+        app: flask-app
+    spec:
+      containers:
+        - name: flask-app
+          image: flask-app:latest
+          ports:
+            - containerPort: 5000
+
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "250m"
+              memory: "256Mi"
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 10
+            periodSeconds: 15
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: flask-service
+spec:
+  selector:
+    app: flask-app
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: 5000
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: flask-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: flask-app
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+Key Concepts Used
+1. Deployment
+Ensures desired number of replicas (2 pods)
+Handles self-healing and rolling updates
+
+2. Service
+Exposes pods internally within the cluster
+Provides stable networking for the application
+
+3. Horizontal Pod Autoscaler
+Automatically scales pods based on CPU usage
+Helps handle variable traffic loads
+
+4. Resource Limits
+Prevents excessive CPU/memory usage
+Improves cluster stability
+
+5. Health Probes
+Liveness probe: restarts unhealthy containers
+Readiness probe: ensures traffic only goes to ready pods
+Assumptions
+Docker image (flask-app:latest) is already built and available in registry
+Kubernetes cluster is already running (EKS / Minikube / etc.)
+Metrics server is installed for HPA to work properly
+Limitations (My Current Understanding)
+No Ingress controller configured yet
+No ConfigMaps or Secrets used yet
+No persistent storage configured
+No advanced deployment strategies (e.g., blue-green or canary deployments)
+What I Understand So Far
+
+This setup provides:
+
+Basic application deployment in Kubernetes
+Simple scaling capability
+Basic health monitoring
+Internal service exposure
+Automatic scaling based on CPU usage
+Time Spent
+Understanding requirements: 10 minutes
+Writing Kubernetes manifest: 15 minutes
+Structuring documentation: 10 minutes
+
+Total: 35 minutes
+
+## Summary
+
+This Kubernetes setup demonstrates:
+
+Core Kubernetes objects (Deployment, Service, HPA)
+Basic scaling and reliability concepts
+Health checking and resource management
+
+It is not production-ready, but shows foundational understanding of Kubernetes architecture.
+## Tools Used
+Kubernetes (core objects)
+Deployment
+Service
+Horizontal Pod Autoscaler (HPA)
+Docker (container runtime)
+kubectl (deployment management)
+Metrics Server (HPA dependency)
+AWS EKS / Minikube (assumed cluster environments)
+YAML (manifest configuration format)
