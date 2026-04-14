@@ -364,3 +364,141 @@ Design and planning: 10 minutes
 Implementation: 15 minutes
 Testing and validation thinking: 5 minutes
 
+#### Part 4: Bash Scripting (Nginx Log Analysis)
+
+## Overview
+
+This script analyzes Nginx access logs and generates a summary report including:
+
+- Top 10 IP addresses by request count
+- Error rate analysis (4xx and 5xx)
+- Top 10 most accessed endpoints
+- Structured formatted output to stdout
+
+The solution is designed using standard Linux tools only, with no external dependencies.
+
+---
+
+## Script Requirements
+
+- Accept log file path as input argument
+- Use standard Linux utilities only (`awk`, `sort`, `uniq`, `grep`)
+- Handle missing or malformed log entries gracefully
+- Output results in readable format
+- Work with standard Nginx log format
+
+---
+
+## Expected Log Format
+
+The script assumes standard Nginx access logs:
+
+
+IP - - [date] "GET /endpoint HTTP/1.1" status ...
+
+
+Field mapping:
+
+- `$1` → IP Address
+- `$7` → Endpoint
+- `$9` → HTTP Status Code
+
+---
+
+## Usage
+
+chmod +x analyze_nginx_logs.sh
+
+./analyze_nginx_logs.sh /var/log/nginx/access.log
+Output Example
+======================================
+         Nginx Log Report
+======================================
+
+Total Requests: 15234
+
+Top 10 IP Addresses:
+2341 203.0.113.50
+1892 198.51.100.23
+...
+
+Error Analysis:
+4xx Errors: 234 (1.54%)
+5xx Errors: 12 (0.08%)
+
+Top 10 Endpoints:
+3421 /api/v1/users
+2156 /api/v1/products
+
+======================================
+Report Completed
+======================================
+Key Fixes and Design Considerations
+1. Handles Malformed Logs
+Ignores empty or missing fields
+Prevents pipeline failures due to invalid lines
+2. No External Dependencies
+
+Only standard Linux tools are used:
+
+awk
+sort
+uniq
+grep
+
+This ensures portability across all Linux systems.
+
+3. Safe Calculations
+Prevents division by zero errors
+Uses awk BEGIN blocks for safe percentage computation
+4. Standard Log Format Assumption
+
+Works with default Nginx access log structure:
+
+$1 → Client IP
+$7 → Requested endpoint
+$9 → HTTP status code
+Important Considerations
+Field Parsing Risk
+
+If log format differs, field positions may shift.
+This script assumes a standard Nginx configuration.
+
+Data Validation
+
+The script:
+
+Skips empty endpoints
+Avoids malformed entries
+Ensures stable pipeline execution
+Performance
+
+Efficient streaming design:
+
+No in-memory data storage
+Uses Unix pipelines for processing large logs
+Time Complexity
+IP analysis: O(n log n)
+Endpoint analysis: O(n log n)
+Error analysis: O(n)
+
+Suitable for large production log files.
+
+##### Tools Used
+Bash scripting
+awk (log parsing & computation)
+sort (ranking results)
+uniq (aggregation)
+grep (filtering logs)
+sed (optional text processing)
+Nginx access logs (/var/log/nginx/access.log)
+
+
+#### Time Spent
+
+Total time required: 20 minutes
+
+Log parsing logic design: 7 minutes
+Script implementation: 10 minutes
+Validation and edge case handling: 3 minutes
+
